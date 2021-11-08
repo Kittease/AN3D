@@ -1,4 +1,4 @@
-TARGET ?= pgm
+TARGET ?= boids
 SRC_DIRS ?= .
 
 CXX ?= g++

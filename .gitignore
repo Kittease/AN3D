@@ -1,1 +1,3 @@
-boids
+/boids
+*.d
+*.o
