@@ -51,14 +51,19 @@ void scene_model::update_flock()
     for (auto &mate : mates)
     {
         mate->drawn = false;
-        vcl::vec3 old_pos = mate->pos;
-        vcl::vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
+        vec3 old_pos = mate->pos;
+        vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
+        mate->findVisibleMates(mates, mate_view_angle);
+        vec3 avoidance = mate->avoid();
+        auto avoidance_norm = norm(avoidance);
+        if (avoidance_norm != 0)
+            avoidance /= avoidance_norm;
 
-        vcl::vec3 new_dir = vcl::normalize(mate->dir + random_dir_variation);
+        vcl::vec3 new_dir =
+            vcl::normalize(mate->dir + random_dir_variation + avoidance);
         vcl::vec3 new_pos = old_pos + dt * (mate->speed * new_dir);
         mate->dir = new_dir;
         mate->pos = new_pos;
-        mate->findVisibleMates(mates, mate_view_angle);
     }
 }
 
@@ -87,7 +92,7 @@ static void set_gui(timer_basic &timer, float &angle)
     float angle_min = 60;
     float angle_max = 360;
     ImGui::SliderScalar("Mate FOV", ImGuiDataType_Float, &angle, &angle_min,
-                        &angle_max, "%.2f s");
+                        &angle_max, "%.f");
 
     if (ImGui::Button("Stop"))
         timer.stop();
