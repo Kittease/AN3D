@@ -26,11 +26,12 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
     gui.show_frame_camera = false;
 
     flock.resize(n_mates);
+    random_real_generator init_gen{ -1, 1 };
     for (int i = 0; i < n_mates; i++)
     {
-        vcl::vec3 dir{ 0.25, 0.25, 0. };
+        vcl::vec3 dir{ init_gen(), init_gen(), init_gen() };
         dir = vcl::normalize(dir);
-        flock[i] = mate{ { 0, 0, 0 }, dir, 0.25 };
+        flock[i] = mate{ { init_gen(), init_gen(), init_gen() }, dir, 0.25 };
     }
 
     mate_mesh =
@@ -53,7 +54,7 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
         vcl::vec3 position = flock[i].pos;
 
         vcl::vec3 old_pos = flock[i].pos;
-        vcl::vec3 random_dir_variation{ gen(), gen(), gen() };
+        vcl::vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
         vcl::vec3 new_dir = vcl::normalize(dir + random_dir_variation);
         vcl::vec3 new_pos = position + dt * (flock[i].speed * new_dir);
 

@@ -46,7 +46,7 @@ struct scene_model : scene_base
     vcl::segments_drawable borders;
 
     vcl::timer_event timer;
-    random_real_generator gen{ -RANDOM_VARIATION, RANDOM_VARIATION };
+    random_real_generator var_gen{ -RANDOM_VARIATION, RANDOM_VARIATION };
 };
 
 #endif
