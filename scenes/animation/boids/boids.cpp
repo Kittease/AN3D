@@ -8,8 +8,9 @@
 using namespace vcl;
 
 static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
-                    float &avoidance_coeff, float &cohesion_coeff,
-                    float &avoidance_radius_ratio);
+                    float &avoidance_coeff, float &avoidance_radius_ratio,
+                    float &alignment_coeff, float &alignment_radius_ratio,
+                    float &cohesion_coeff);
 
 float computeAngle(const vcl::vec3 &a, const vcl::vec3 &b)
 {
@@ -73,11 +74,13 @@ void scene_model::update_flock()
         vec3 mate_avoidance_dir = mate->avoid_mates(avoidance_radius_ratio);
         vec3 wall_avoidance_dir =
             mate->avoid_walls(avoidance_radius_ratio, cube_faces);
+        vec3 alignment_dir = mate->alignment(alignment_radius_ratio);
         vec3 cohesion_dir = mate->cohesion();
 
         vec3 new_dir = normalize(mate->dir + random_dir_variation
                                  + 0.075f * wall_avoidance_dir
                                  + avoidance_coeff * 0.05f * mate_avoidance_dir
+                                 + alignment_coeff * 0.05f * alignment_dir
                                  + cohesion_coeff * 0.05f * cohesion_dir);
         vec3 new_pos = old_pos + dt * (mate->speed * new_dir);
         mate->dir = new_dir;
@@ -89,8 +92,9 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
                              scene_structure &scene, gui_structure &)
 {
     timer.update();
-    set_gui(timer, fov_radius, mate_view_angle, avoidance_coeff, cohesion_coeff,
-            avoidance_radius_ratio);
+    set_gui(timer, fov_radius, mate_view_angle, avoidance_coeff,
+            avoidance_radius_ratio, alignment_coeff, alignment_radius_ratio,
+            cohesion_coeff);
 
     update_flock();
     mates[0]->draw_mate(mate_mesh, scene.camera, { 0.2, 0.3, 1 });
@@ -108,8 +112,9 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
 }
 
 static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
-                    float &avoidance_coeff, float &cohesion_coeff,
-                    float &avoidance_radius_ratio)
+                    float &avoidance_coeff, float &avoidance_radius_ratio,
+                    float &alignment_coeff, float &alignment_radius_ratio,
+                    float &cohesion_coeff)
 {
     float scale_min = 0.05f;
     float scale_max = 2.0f;
@@ -137,6 +142,18 @@ static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
     ImGui::SliderScalar("Avoidance Radius Ratio", ImGuiDataType_Float,
                         &avoidance_radius_ratio, &avoidance_radius_min,
                         &avoidance_radius_max, "%.2f");
+
+    float alignment_min = 0.f;
+    float alignment_max = 1.f;
+    ImGui::SliderScalar("Alignment Strength", ImGuiDataType_Float,
+                        &alignment_coeff, &alignment_min, &alignment_max,
+                        "%.2f");
+
+    float alignment_radius_min = 0.f;
+    float alignment_radius_max = 1.f;
+    ImGui::SliderScalar("Alignment Radius Ratio", ImGuiDataType_Float,
+                        &alignment_radius_ratio, &alignment_radius_min,
+                        &alignment_radius_max, "%.2f");
 
     float cohesion_min = 0.f;
     float cohesion_max = 1.f;

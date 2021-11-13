@@ -117,6 +117,17 @@ struct mate
         auto center_dir_norm = norm(center_dir);
         return center_dir_norm == 0 ? center_dir : center_dir / center_dir_norm;
     }
+
+    vcl::vec3 alignment(float alignment_ratio)
+    {
+        vcl::vec3 mate_dir{ 0, 0, 0 };
+        for (const auto &mate : visibleMates)
+            if (norm(mate->pos - pos) < fov_radius * alignment_ratio)
+                mate_dir += mate->dir;
+
+        auto mate_dir_norm = norm(mate_dir);
+        return mate_dir_norm == 0 ? mate_dir : mate_dir / mate_dir_norm;
+    }
 };
 
 class random_real_generator
@@ -152,6 +163,8 @@ struct scene_model : scene_base
     float fov_radius = 0.5f;
     float avoidance_radius_ratio = 0.25f;
     float avoidance_coeff = 0.5f;
+    float alignment_radius_ratio = 0.5f;
+    float alignment_coeff = 0.5f;
     float cohesion_coeff = 0.5f;
 
     flock mates;
