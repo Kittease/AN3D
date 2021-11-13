@@ -67,30 +67,41 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
 
     gui.show_frame_camera = false;
 
-    mates.reserve(n_mates);
+    cur_mates = std::make_shared<flock>();
+    next_mates = std::make_shared<flock>();
+    cur_mates->reserve(n_mates);
+    next_mates->reserve(n_mates);
     random_real_generator init_gen{ -CUBE_HALF + 0.2, CUBE_HALF - 0.2 };
     for (int i = 0; i < n_mates; i++)
     {
+        vcl::vec3 pos{ init_gen(), init_gen(), init_gen() };
         vcl::vec3 dir{ init_gen(), init_gen(), init_gen() };
         dir = vcl::normalize(dir);
-        mates.push_back(std::make_shared<mate>(mate{
-            { init_gen(), init_gen(), init_gen() }, dir, 0.5, fov_radius }));
+        cur_mates->push_back(
+            std::make_shared<mate>(mate{ pos, dir, 0.5, fov_radius }));
+        next_mates->push_back(
+            std::make_shared<mate>(mate{ pos, dir, 0.5, fov_radius }));
     }
 
     mate_mesh =
         mesh_drawable(mesh_primitive_cone(0.02, { 0, 0, 0 }, { 0.06, 0, 0 }));
     mate_mesh.shader = shaders["mesh"];
+
+    for (auto &mate : *cur_mates)
+        mate->findVisibleMates(*cur_mates, mate_view_angle);
 }
 
 void scene_model::update_flock()
 {
     float dt = 0.02f * timer.scale;
-    for (auto &mate : mates)
+    auto cur = *cur_mates;
+    auto next = *next_mates;
+    for (size_t i = 0; i < cur.size(); ++i)
     {
-        mate->drawn = false;
-        vec3 old_pos = mate->pos;
+        auto mate = cur[i];
+        auto next_mate = next[i];
+
         vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
-        mate->findVisibleMates(mates, mate_view_angle);
         vec3 mate_avoidance_dir = mate->avoid_mates(avoidance_radius_ratio);
         vec3 wall_avoidance_dir =
             mate->avoid_walls(avoidance_radius_ratio, cube_faces);
@@ -102,10 +113,14 @@ void scene_model::update_flock()
                                  + avoidance_coeff * 0.05f * mate_avoidance_dir
                                  + alignment_coeff * 0.05f * alignment_dir
                                  + cohesion_coeff * 0.05f * cohesion_dir);
-        vec3 new_pos = old_pos + dt * (mate->speed * new_dir);
-        mate->dir = new_dir;
-        mate->pos = new_pos;
+        vec3 new_pos = mate->pos + dt * (mate->speed * new_dir);
+
+        next_mate->drawn = false;
+        next_mate->dir = new_dir;
+        next_mate->pos = new_pos;
     }
+
+    cur_mates.swap(next_mates);
 }
 
 void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
@@ -117,17 +132,24 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
             cohesion_coeff);
 
     update_flock();
-    mates[0]->draw_mate(mate_mesh, scene.camera, { 0.2, 0.3, 1 });
-    for (const auto &mate : mates[0]->visibleMates)
+    auto cur = *cur_mates;
+    for (auto &mate : cur)
+        mate->findVisibleMates(cur, mate_view_angle);
+
+    auto &subject_0 = *cur[0];
+    subject_0.draw_mate(mate_mesh, scene.camera, { 0.2, 0.3, 1 });
+    for (const auto &mate : subject_0.visibleMates)
     {
-        auto distToMate = norm(mate->pos - mates[0]->pos);
-        if (distToMate < mates[0]->fov_radius * avoidance_radius_ratio)
+        auto distToMate = norm(mate->pos - subject_0.pos);
+        if (distToMate < subject_0.fov_radius * avoidance_radius_ratio)
             mate->draw_mate(mate_mesh, scene.camera, { 1., 0.2, 0.3 });
-        else if (distToMate < mates[0]->fov_radius)
+        else if (distToMate < subject_0.fov_radius)
             mate->draw_mate(mate_mesh, scene.camera, { 0.2, 1., 0.3 });
     }
-    for (const auto &mate : mates)
+
+    for (const auto &mate : cur)
         mate->draw_mate(mate_mesh, scene.camera, { 0.2, 0.8, 1 });
+
     draw(borders, scene.camera, shaders["curve"]);
 }
 

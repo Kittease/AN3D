@@ -167,7 +167,8 @@ struct scene_model : scene_base
     float alignment_coeff = 0.5f;
     float cohesion_coeff = 0.5f;
 
-    flock mates;
+    std::shared_ptr<flock> cur_mates;
+    std::shared_ptr<flock> next_mates;
     vcl::mesh_drawable mate_mesh;
 
     vcl::buffer<plane> cube_faces;
