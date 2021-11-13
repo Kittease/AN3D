@@ -9,10 +9,12 @@
 
 using namespace vcl;
 
+
+
 static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
                     float &avoidance_coeff, float &avoidance_radius_ratio,
                     float &alignment_coeff, float &alignment_radius_ratio,
-                    float &cohesion_coeff);
+                    float &cohesion_coeff, bool &debug_mode);
 
 float computeAngle(const vcl::vec3 &a, const vcl::vec3 &b)
 {
@@ -68,13 +70,35 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
     gui.show_frame_camera = false;
 
     mates.reserve(n_mates);
+
     random_real_generator init_gen{ -CUBE_HALF + 0.2, CUBE_HALF - 0.2 };
+
+    random_real_generator color_shuffle{ 0, 3 };
+    random_real_generator color_dom{ 0.75, 1 };
+    random_real_generator color_sub{ 0.1, 0.35 };
+    random_real_generator infectivity_gen{ 0.25, 1 };
+
     for (int i = 0; i < n_mates; i++)
     {
+        vcl::vec3 pos{ init_gen(), init_gen(), init_gen() };
+
         vcl::vec3 dir{ init_gen(), init_gen(), init_gen() };
         dir = vcl::normalize(dir);
-        mates.push_back(std::make_shared<mate>(mate{
-            { init_gen(), init_gen(), init_gen() }, dir, 0.5, fov_radius }));
+
+        vcl::vec3 color;
+        switch (int(color_shuffle())) {
+            case 0:
+                color = { color_dom(), color_sub(), color_sub() };
+                break;
+            case 1:
+                color = { color_sub(), color_dom(), color_sub() };
+                break;
+            case 2:
+                color = { color_sub(), color_sub(), color_dom() };
+                break;
+        }
+
+        mates.push_back(std::make_shared<mate>(mate{pos, dir, 0.5, fov_radius, color, infectivity_gen() }));
     }
 
     mate_mesh =
@@ -97,6 +121,8 @@ void scene_model::update_flock()
         vec3 alignment_dir = mate->alignment(alignment_radius_ratio);
         vec3 cohesion_dir = mate->cohesion();
 
+        mate->update_color();
+
         vec3 new_dir = normalize(mate->dir + random_dir_variation
                                  + 0.075f * wall_avoidance_dir
                                  + avoidance_coeff * 0.05f * mate_avoidance_dir
@@ -114,27 +140,33 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
     timer.update();
     set_gui(timer, fov_radius, mate_view_angle, avoidance_coeff,
             avoidance_radius_ratio, alignment_coeff, alignment_radius_ratio,
-            cohesion_coeff);
+            cohesion_coeff, debug_mode);
 
     update_flock();
-    mates[0]->draw_mate(mate_mesh, scene.camera, { 0.2, 0.3, 1 });
-    for (const auto &mate : mates[0]->visibleMates)
-    {
-        auto distToMate = norm(mate->pos - mates[0]->pos);
-        if (distToMate < mates[0]->fov_radius * avoidance_radius_ratio)
-            mate->draw_mate(mate_mesh, scene.camera, { 1., 0.2, 0.3 });
-        else if (distToMate < mates[0]->fov_radius)
-            mate->draw_mate(mate_mesh, scene.camera, { 0.2, 1., 0.3 });
+    if (!debug_mode) {
+        for (const auto &mate : mates)
+            mate->draw_mate(mate_mesh, scene.camera, mate->color);
+    } else {
+        mates[0]->draw_mate(mate_mesh, scene.camera, { 0.2, 0.3, 1 });
+        for (const auto &mate : mates[0]->visibleMates)
+        {
+            auto distToMate = norm(mate->pos - mates[0]->pos);
+            if (distToMate < mates[0]->fov_radius * avoidance_radius_ratio)
+                mate->draw_mate(mate_mesh, scene.camera, { 1., 0.2, 0.3 });
+            else if (distToMate < mates[0]->fov_radius)
+                mate->draw_mate(mate_mesh, scene.camera, { 0.2, 1., 0.3 });
+        }
+        for (const auto &mate : mates)
+            mate->draw_mate(mate_mesh, scene.camera, { 0.2, 0.8, 1 });
     }
-    for (const auto &mate : mates)
-        mate->draw_mate(mate_mesh, scene.camera, { 0.2, 0.8, 1 });
+
     draw(borders, scene.camera, shaders["curve"]);
 }
 
 static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
                     float &avoidance_coeff, float &avoidance_radius_ratio,
                     float &alignment_coeff, float &alignment_radius_ratio,
-                    float &cohesion_coeff)
+                    float &cohesion_coeff, bool &debug_mode)
 {
     float scale_min = 0.05f;
     float scale_max = 2.0f;
@@ -179,6 +211,8 @@ static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
     float cohesion_max = 1.f;
     ImGui::SliderScalar("Cohesion Strength", ImGuiDataType_Float,
                         &cohesion_coeff, &cohesion_min, &cohesion_max, "%.2f");
+
+    ImGui::Checkbox("Debug Mode", &debug_mode);
 
     if (ImGui::Button("Stop"))
         timer.stop();

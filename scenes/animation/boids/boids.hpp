@@ -28,11 +28,18 @@ struct mate
     bool drawn = false;
     flock visibleMates;
 
-    mate(vcl::vec3 pos, vcl::vec3 dir, float speed, float &fov_radius)
+    vcl::vec3 base_color;
+    vcl::vec3 color;
+    float infectivity;
+
+    mate(vcl::vec3 pos, vcl::vec3 dir, float speed, float &fov_radius, vcl::vec3 color, float infectivity)
         : pos{ pos }
         , dir{ dir }
         , speed{ speed }
         , fov_radius{ fov_radius }
+        , base_color{ color }
+        , color{ color }
+        , infectivity{ infectivity }
     {}
 
     void draw_mate(vcl::mesh_drawable &mate_mesh, vcl::camera_scene &camera,
@@ -61,6 +68,29 @@ struct mate
             if (vcl::norm(curToMate) < fov_radius
                 && computeAngle(dir, curToMate) < angle / 2)
                 visibleMates.emplace_back(mate);
+        }
+    }
+
+    void update_color() {
+        int len = visibleMates.size();
+
+        if (len == 0) {
+            color = base_color;
+        } else {
+            float R = 0, G = 0, B = 0;
+
+            for (const auto &mate : visibleMates) {
+                auto c = mate->color;
+                R += c[0];
+                G += c[1];
+                B += c[2];
+            }
+
+            R = color[0] * infectivity + (R / len) * (1 - infectivity);
+            G = color[1] * infectivity + (G / len) * (1 - infectivity);
+            B = color[2] * infectivity + (B / len) * (1 - infectivity);
+
+            color = { R, G, B };
         }
     }
 
@@ -160,12 +190,13 @@ struct scene_model : scene_base
 
     int n_mates = 500;
     float mate_view_angle = 180;
-    float fov_radius = 0.5f;
+    float fov_radius = 0.35f;
     float avoidance_radius_ratio = 0.25f;
     float avoidance_coeff = 0.5f;
     float alignment_radius_ratio = 0.5f;
     float alignment_coeff = 0.5f;
     float cohesion_coeff = 0.5f;
+    bool debug_mode = false;
 
     flock mates;
     vcl::mesh_drawable mate_mesh;
