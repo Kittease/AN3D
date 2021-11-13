@@ -76,7 +76,7 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
     random_real_generator color_shuffle{ 0, 3 };
     random_real_generator color_dom{ 0.75, 1 };
     random_real_generator color_sub{ 0.1, 0.35 };
-    random_real_generator infectivity_gen{ 0.25, 1 };
+    random_real_generator infectivity_gen{ 0.01, 1 };
 
     for (int i = 0; i < n_mates; i++)
     {

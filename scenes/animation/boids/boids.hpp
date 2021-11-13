@@ -87,16 +87,19 @@ struct mate
         vcl::vec3 mate_avoid{ 0, 0, 0 };
         vcl::vec3 alignment{ 0, 0, 0 };
         vcl::vec3 center{ 0, 0, 0 };
-        vcl::vec3 color{ 0, 0, 0 };
-        float weights = 0;
+        vcl::vec3 color = base_color;
+        float max_infectivity = infectivity;
 
         if (visibleMates.empty())
             return { mate_avoid, alignment, center, base_color };
 
         for (const auto &mate : visibleMates)
         {
-            color += mate->color * mate->infectivity;
-            weights += mate->infectivity;
+            if (mate->infectivity > max_infectivity)
+            {
+                color = mate->color;
+                max_infectivity = mate->infectivity;
+            }
 
             auto &mate_pos = mate->pos;
             center += mate_pos;
@@ -110,10 +113,6 @@ struct mate
                     mate_avoid -= curToMate / (strength * strength);
             }
         }
-
-        // Colouring
-        color =
-            (this->color * infectivity) + (color / weights) * (1 - infectivity);
 
         // Cohesion
         center /= visibleMates.size();
@@ -132,7 +131,8 @@ struct mate
         if (alignment_norm != 0)
             alignment /= alignment_norm;
 
-        return { mate_avoid, alignment, center_dir, color };
+        return { mate_avoid, alignment, center_dir,
+                 0.9 * this->color + 0.1 * color };
     }
 
     vcl::vec3 avoid_walls(float avoid_ratio,
