@@ -7,8 +7,9 @@
 
 using namespace vcl;
 
-static void set_gui(timer_basic &timer, float &angle, float &avoidance_coeff,
-                    float &cohesion_coeff);
+static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
+                    float &avoidance_coeff, float &cohesion_coeff,
+                    float &avoidance_radius_ratio);
 
 float computeAngle(const vcl::vec3 &a, const vcl::vec3 &b)
 {
@@ -51,8 +52,8 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
     {
         vcl::vec3 dir{ init_gen(), init_gen(), init_gen() };
         dir = vcl::normalize(dir);
-        mates.push_back(std::make_shared<mate>(
-            mate{ { init_gen(), init_gen(), init_gen() }, dir, 0.25, 0.5 }));
+        mates.push_back(std::make_shared<mate>(mate{
+            { init_gen(), init_gen(), init_gen() }, dir, 0.25, fov_radius }));
     }
 
     mate_mesh =
@@ -69,8 +70,9 @@ void scene_model::update_flock()
         vec3 old_pos = mate->pos;
         vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
         mate->findVisibleMates(mates, mate_view_angle);
-        vec3 mate_avoidance_dir = mate->avoid_mates();
-        vec3 wall_avoidance_dir = mate->avoid_walls(cube_faces);
+        vec3 mate_avoidance_dir = mate->avoid_mates(avoidance_radius_ratio);
+        vec3 wall_avoidance_dir =
+            mate->avoid_walls(avoidance_radius_ratio, cube_faces);
         vec3 cohesion_dir = mate->cohesion();
 
         vec3 new_dir = normalize(mate->dir + random_dir_variation
@@ -87,14 +89,15 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
                              scene_structure &scene, gui_structure &)
 {
     timer.update();
-    set_gui(timer, mate_view_angle, avoidance_coeff, cohesion_coeff);
+    set_gui(timer, fov_radius, mate_view_angle, avoidance_coeff, cohesion_coeff,
+            avoidance_radius_ratio);
 
     update_flock();
     mates[0]->draw_mate(mate_mesh, scene.camera, { 0.2, 0.3, 1 });
     for (const auto &mate : mates[0]->visibleMates)
     {
         auto distToMate = norm(mate->pos - mates[0]->pos);
-        if (distToMate < mates[0]->avoid_radius)
+        if (distToMate < mates[0]->fov_radius * avoidance_radius_ratio)
             mate->draw_mate(mate_mesh, scene.camera, { 1., 0.2, 0.3 });
         else if (distToMate < mates[0]->fov_radius)
             mate->draw_mate(mate_mesh, scene.camera, { 0.2, 1., 0.3 });
@@ -104,28 +107,41 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
     draw(borders, scene.camera, shaders["curve"]);
 }
 
-static void set_gui(timer_basic &timer, float &angle, float &avoidance_coeff,
-                    float &cohesion_coeff)
+static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
+                    float &avoidance_coeff, float &cohesion_coeff,
+                    float &avoidance_radius_ratio)
 {
     float scale_min = 0.05f;
     float scale_max = 2.0f;
     ImGui::SliderScalar("Time scale", ImGuiDataType_Float, &timer.scale,
                         &scale_min, &scale_max, "%.2f s");
 
+    float fov_radius_min = 0.1f;
+    float fov_radius_max = 2.f;
+    ImGui::SliderScalar("Mate FOV Radius", ImGuiDataType_Float, &fov_radius,
+                        &fov_radius_min, &fov_radius_max, "%.2f");
+
     float angle_min = 60;
     float angle_max = 360;
-    ImGui::SliderScalar("Mate FOV", ImGuiDataType_Float, &angle, &angle_min,
-                        &angle_max, "%.f");
+    ImGui::SliderScalar("Mate FOV Angle", ImGuiDataType_Float, &angle,
+                        &angle_min, &angle_max, "%.f");
 
     float avoidance_min = 0.f;
     float avoidance_max = 1.f;
-    ImGui::SliderScalar("Avoidance", ImGuiDataType_Float, &avoidance_coeff,
-                        &avoidance_min, &avoidance_max, "%.2f");
+    ImGui::SliderScalar("Avoidance Strength", ImGuiDataType_Float,
+                        &avoidance_coeff, &avoidance_min, &avoidance_max,
+                        "%.2f");
+
+    float avoidance_radius_min = 0.f;
+    float avoidance_radius_max = 1.f;
+    ImGui::SliderScalar("Avoidance Radius Ratio", ImGuiDataType_Float,
+                        &avoidance_radius_ratio, &avoidance_radius_min,
+                        &avoidance_radius_max, "%.2f");
 
     float cohesion_min = 0.f;
     float cohesion_max = 1.f;
-    ImGui::SliderScalar("Cohesion", ImGuiDataType_Float, &cohesion_coeff,
-                        &cohesion_min, &cohesion_max, "%.2f");
+    ImGui::SliderScalar("Cohesion Strength", ImGuiDataType_Float,
+                        &cohesion_coeff, &cohesion_min, &cohesion_max, "%.2f");
 
     if (ImGui::Button("Stop"))
         timer.stop();

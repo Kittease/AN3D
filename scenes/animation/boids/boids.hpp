@@ -5,7 +5,7 @@
 #include "main/scene_base/base.hpp"
 
 #ifdef SCENE_BOIDS
-#    define RANDOM_VARIATION 0.001f
+#    define RANDOM_VARIATION 0.025f
 
 struct mate;
 using flock = std::vector<std::shared_ptr<mate>>;
@@ -25,7 +25,6 @@ struct mate
     float speed;
 
     float fov_radius;
-    float avoid_radius;
     bool drawn = false;
     flock visibleMates;
 
@@ -34,7 +33,6 @@ struct mate
         , dir{ dir }
         , speed{ speed }
         , fov_radius{ fov_radius }
-        , avoid_radius{ fov_radius / 4 }
     {}
 
     void draw_mate(vcl::mesh_drawable &mate_mesh, vcl::camera_scene &camera,
@@ -66,14 +64,14 @@ struct mate
         }
     }
 
-    vcl::vec3 avoid_mates()
+    vcl::vec3 avoid_mates(float avoid_ratio)
     {
         vcl::vec3 f{ 0, 0, 0 };
         for (const auto &mate : visibleMates)
         {
             auto curToMate = mate->pos - pos;
             auto strength = vcl::norm(curToMate);
-            if (strength <= avoid_radius)
+            if (strength <= fov_radius * avoid_ratio)
             {
                 // f -= curToMate;
                 // vcl::vec3 dn = curToMate / strength * dot(dir, curToMate);
@@ -86,13 +84,13 @@ struct mate
         return f_norm == 0 ? f : f / f_norm;
     }
 
-    vcl::vec3 avoid_walls(const vcl::buffer<plane> &faces)
+    vcl::vec3 avoid_walls(float avoid_ratio, const vcl::buffer<plane> &faces)
     {
         vcl::vec3 f{ 0, 0, 0 };
         for (const auto &face : faces)
         {
             float collision = dot(pos - face.a, face.n);
-            if (collision <= avoid_radius)
+            if (collision <= fov_radius * avoid_ratio)
             {
                 // float d = avoid_radius - collision;
                 // pos += d * face.n;
@@ -151,6 +149,8 @@ struct scene_model : scene_base
 
     int n_mates = 300;
     float mate_view_angle = 180;
+    float fov_radius = 0.5f;
+    float avoidance_radius_ratio = 0.25f;
     float avoidance_coeff = 0.5f;
     float cohesion_coeff = 0.5f;
 
