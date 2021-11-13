@@ -73,29 +73,15 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
     next_mates->reserve(n_mates);
     random_real_generator init_gen{ -CUBE_HALF + 0.2, CUBE_HALF - 0.2 };
 
-    random_real_generator color_shuffle{ 0, 3 };
-    random_real_generator color_dom{ 0.75, 1 };
-    random_real_generator color_sub{ 0.1, 0.35 };
+    random_real_generator color_gen{ 0, 1 };
     random_real_generator infectivity_gen{ 0.01, 1 };
 
     for (int i = 0; i < n_mates; i++)
     {
-        vcl::vec3 pos{ init_gen(), init_gen(), init_gen() };
-        vcl::vec3 dir{ init_gen(), init_gen(), init_gen() };
+        vec3 pos{ init_gen(), init_gen(), init_gen() };
+        vec3 dir{ init_gen(), init_gen(), init_gen() };
         dir = vcl::normalize(dir);
-        vcl::vec3 color;
-        switch (int(color_shuffle()))
-        {
-        case 0:
-            color = { color_dom(), color_sub(), color_sub() };
-            break;
-        case 1:
-            color = { color_sub(), color_dom(), color_sub() };
-            break;
-        case 2:
-            color = { color_sub(), color_sub(), color_dom() };
-            break;
-        }
+        vec3 color = { color_gen(), color_gen(), color_gen() };
         cur_mates->push_back(std::make_shared<mate>(
             mate{ pos, dir, 0.5, fov_radius, color, infectivity_gen() }));
         next_mates->push_back(std::make_shared<mate>(
