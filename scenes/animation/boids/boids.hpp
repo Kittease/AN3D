@@ -19,6 +19,14 @@ struct plane
     vcl::vec3 a;
 };
 
+struct update_vectors
+{
+    vcl::vec3 mate_avoid;
+    vcl::vec3 alignment;
+    vcl::vec3 cohesion;
+    vcl::vec3 color;
+};
+
 struct mate
 {
     vcl::vec3 pos;
@@ -73,6 +81,60 @@ struct mate
         }
     }
 
+    update_vectors compute_update(float avoid_ratio,
+                                  float alignment_ratio) const
+    {
+        vcl::vec3 mate_avoid{ 0, 0, 0 };
+        vcl::vec3 alignment{ 0, 0, 0 };
+        vcl::vec3 center{ 0, 0, 0 };
+        vcl::vec3 color{ 0, 0, 0 };
+        float weights = 0;
+
+        if (visibleMates.empty())
+            return { mate_avoid, alignment, center, base_color };
+
+        for (const auto &mate : visibleMates)
+        {
+            color += mate->color * mate->infectivity;
+            weights += mate->infectivity;
+
+            auto &mate_pos = mate->pos;
+            center += mate_pos;
+
+            auto curToMate = mate_pos - pos;
+            auto strength = vcl::norm(curToMate);
+            if (strength < fov_radius * alignment_ratio)
+            {
+                alignment += mate->dir;
+                if (strength < fov_radius * avoid_ratio)
+                    mate_avoid -= curToMate / (strength * strength);
+            }
+        }
+
+        // Colouring
+        color =
+            (this->color * infectivity) + (color / weights) * (1 - infectivity);
+
+        // Cohesion
+        center /= visibleMates.size();
+        auto center_dir = center - pos;
+        auto center_dir_norm = norm(center_dir);
+        if (center_dir_norm != 0)
+            center_dir /= center_dir_norm;
+
+        // Separation
+        auto mate_avoid_norm = norm(mate_avoid);
+        if (mate_avoid_norm != 0)
+            mate_avoid /= mate_avoid_norm;
+
+        // Alignment
+        auto alignment_norm = norm(alignment);
+        if (alignment_norm != 0)
+            alignment /= alignment_norm;
+
+        return { mate_avoid, alignment, center_dir, color };
+    }
+
     vcl::vec3 update_color()
     {
         int len = visibleMates.size();
@@ -82,21 +144,17 @@ struct mate
             color = base_color;
         else
         {
-            float R = 0, G = 0, B = 0;
+            color = { 0, 0, 0 };
+            float weights = 0;
 
             for (const auto &mate : visibleMates)
             {
-                auto c = mate->color;
-                R += c[0];
-                G += c[1];
-                B += c[2];
+                color += mate->color * mate->infectivity;
+                weights += mate->infectivity;
             }
 
-            R = this->color[0] * infectivity + (R / len) * (1 - infectivity);
-            G = this->color[1] * infectivity + (G / len) * (1 - infectivity);
-            B = this->color[2] * infectivity + (B / len) * (1 - infectivity);
-
-            color = { R, G, B };
+            color = (this->color * infectivity)
+                + (color / weights) * (1 - infectivity);
         }
 
         return color;

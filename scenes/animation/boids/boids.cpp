@@ -124,21 +124,20 @@ void scene_model::update_flock()
 
             vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
             mate->findVisibleMates(cur, mate_view_angle);
-            vec3 mate_avoidance_dir = mate->avoid_mates(avoidance_radius_ratio);
+            update_vectors vecs = mate->compute_update(avoidance_radius_ratio,
+                                                       alignment_radius_ratio);
             vec3 wall_avoidance_dir =
                 mate->avoid_walls(avoidance_radius_ratio, cube_faces);
-            vec3 alignment_dir = mate->alignment(alignment_radius_ratio);
-            vec3 cohesion_dir = mate->cohesion();
 
-            vec3 new_dir = normalize(
-                mate->dir + random_dir_variation + 0.075f * wall_avoidance_dir
-                + avoidance_coeff * 0.05f * mate_avoidance_dir
-                + alignment_coeff * 0.05f * alignment_dir
-                + cohesion_coeff * 0.05f * cohesion_dir);
+            vec3 new_dir = normalize(mate->dir + random_dir_variation
+                                     + 0.075f * wall_avoidance_dir
+                                     + avoidance_coeff * 0.05f * vecs.mate_avoid
+                                     + alignment_coeff * 0.05f * vecs.alignment
+                                     + cohesion_coeff * 0.05f * vecs.cohesion);
             vec3 new_pos = mate->pos + dt * (mate->speed * new_dir);
 
             next_mate->drawn = false;
-            next_mate->color = mate->update_color();
+            next_mate->color = vecs.color;
             next_mate->dir = new_dir;
             next_mate->pos = new_pos;
         }
