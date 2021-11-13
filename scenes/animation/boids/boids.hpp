@@ -135,51 +135,6 @@ struct mate
         return { mate_avoid, alignment, center_dir, color };
     }
 
-    vcl::vec3 update_color()
-    {
-        int len = visibleMates.size();
-        vcl::vec3 color;
-
-        if (len == 0)
-            color = base_color;
-        else
-        {
-            color = { 0, 0, 0 };
-            float weights = 0;
-
-            for (const auto &mate : visibleMates)
-            {
-                color += mate->color * mate->infectivity;
-                weights += mate->infectivity;
-            }
-
-            color = (this->color * infectivity)
-                + (color / weights) * (1 - infectivity);
-        }
-
-        return color;
-    }
-
-    vcl::vec3 avoid_mates(float avoid_ratio) const
-    {
-        vcl::vec3 f{ 0, 0, 0 };
-        for (const auto &mate : visibleMates)
-        {
-            auto curToMate = mate->pos - pos;
-            auto strength = vcl::norm(curToMate);
-            if (strength <= fov_radius * avoid_ratio)
-            {
-                // f -= curToMate;
-                // vcl::vec3 dn = curToMate / strength * dot(dir, curToMate);
-                // vcl::vec3 dt = dir - dn;
-                // f += 0.7 * dt - 0.3 * dn;
-                f -= curToMate / (strength * strength);
-            }
-        }
-        auto f_norm = norm(f);
-        return f_norm == 0 ? f : f / f_norm;
-    }
-
     vcl::vec3 avoid_walls(float avoid_ratio,
                           const vcl::buffer<plane> &faces) const
     {
@@ -188,42 +143,11 @@ struct mate
         {
             float collision = dot(pos - face.a, face.n);
             if (collision <= fov_radius * avoid_ratio)
-            {
-                // float d = avoid_radius - collision;
-                // pos += d * face.n;
-                // vcl::vec3 dn = face.n / collision * dot(dir, face.n);
-                // vcl::vec3 dt = dir - dn;
-                // f += 0.7 * dt - 0.3 * dn;
                 f += face.n / (collision * collision);
-            }
         }
 
         auto f_norm = norm(f);
         return f_norm == 0 ? f : f / f_norm;
-    }
-
-    vcl::vec3 cohesion() const
-    {
-        vcl::vec3 center{ 0, 0, 0 };
-        for (const auto &mate : visibleMates)
-            center += mate->pos;
-        if (!visibleMates.empty())
-            center /= visibleMates.size();
-
-        auto center_dir = center - pos;
-        auto center_dir_norm = norm(center_dir);
-        return center_dir_norm == 0 ? center_dir : center_dir / center_dir_norm;
-    }
-
-    vcl::vec3 alignment(float alignment_ratio) const
-    {
-        vcl::vec3 mate_dir{ 0, 0, 0 };
-        for (const auto &mate : visibleMates)
-            if (norm(mate->pos - pos) < fov_radius * alignment_ratio)
-                mate_dir += mate->dir;
-
-        auto mate_dir_norm = norm(mate_dir);
-        return mate_dir_norm == 0 ? mate_dir : mate_dir / mate_dir_norm;
     }
 };
 
