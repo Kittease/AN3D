@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <thread>
 
 #include "main/scene_base/base.hpp"
 
@@ -64,7 +65,7 @@ struct mate
         }
     }
 
-    vcl::vec3 avoid_mates(float avoid_ratio)
+    vcl::vec3 avoid_mates(float avoid_ratio) const
     {
         vcl::vec3 f{ 0, 0, 0 };
         for (const auto &mate : visibleMates)
@@ -84,7 +85,8 @@ struct mate
         return f_norm == 0 ? f : f / f_norm;
     }
 
-    vcl::vec3 avoid_walls(float avoid_ratio, const vcl::buffer<plane> &faces)
+    vcl::vec3 avoid_walls(float avoid_ratio,
+                          const vcl::buffer<plane> &faces) const
     {
         vcl::vec3 f{ 0, 0, 0 };
         for (const auto &face : faces)
@@ -105,7 +107,7 @@ struct mate
         return f_norm == 0 ? f : f / f_norm;
     }
 
-    vcl::vec3 cohesion()
+    vcl::vec3 cohesion() const
     {
         vcl::vec3 center{ 0, 0, 0 };
         for (const auto &mate : visibleMates)
@@ -118,7 +120,7 @@ struct mate
         return center_dir_norm == 0 ? center_dir : center_dir / center_dir_norm;
     }
 
-    vcl::vec3 alignment(float alignment_ratio)
+    vcl::vec3 alignment(float alignment_ratio) const
     {
         vcl::vec3 mate_dir{ 0, 0, 0 };
         for (const auto &mate : visibleMates)
@@ -158,7 +160,8 @@ struct scene_model : scene_base
                     scene_structure &scene, gui_structure &gui);
     void update_flock();
 
-    int n_mates = 500;
+    const int n_mates = 500;
+    const unsigned short nb_threads = 6;
     float mate_view_angle = 180;
     float fov_radius = 0.5f;
     float avoidance_radius_ratio = 0.25f;
@@ -175,7 +178,6 @@ struct scene_model : scene_base
     vcl::segments_drawable borders;
 
     vcl::timer_event timer;
-    random_real_generator var_gen{ -RANDOM_VARIATION, RANDOM_VARIATION };
 };
 
 #endif

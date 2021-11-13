@@ -5,7 +5,7 @@
 
 #ifdef SCENE_BOIDS
 
-#    define CUBE_HALF 2
+#    define CUBE_HALF 1
 
 using namespace vcl;
 
@@ -94,31 +94,42 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
 void scene_model::update_flock()
 {
     float dt = 0.02f * timer.scale;
-    auto cur = *cur_mates;
-    auto next = *next_mates;
-    for (size_t i = 0; i < cur.size(); ++i)
-    {
-        auto mate = cur[i];
-        auto next_mate = next[i];
+    auto &cur = *cur_mates;
+    auto &next = *next_mates;
 
-        vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
-        vec3 mate_avoidance_dir = mate->avoid_mates(avoidance_radius_ratio);
-        vec3 wall_avoidance_dir =
-            mate->avoid_walls(avoidance_radius_ratio, cube_faces);
-        vec3 alignment_dir = mate->alignment(alignment_radius_ratio);
-        vec3 cohesion_dir = mate->cohesion();
+    auto thread_pool = std::vector<std::thread>();
+    thread_pool.reserve(nb_threads);
+    auto lambda = [&](size_t i) {
+        random_real_generator var_gen{ -RANDOM_VARIATION, RANDOM_VARIATION };
+        for (size_t j = i; j < cur.size(); j += nb_threads)
+        {
+            const auto &mate = cur[j];
+            auto &next_mate = next[j];
 
-        vec3 new_dir = normalize(mate->dir + random_dir_variation
-                                 + 0.075f * wall_avoidance_dir
-                                 + avoidance_coeff * 0.05f * mate_avoidance_dir
-                                 + alignment_coeff * 0.05f * alignment_dir
-                                 + cohesion_coeff * 0.05f * cohesion_dir);
-        vec3 new_pos = mate->pos + dt * (mate->speed * new_dir);
+            vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
+            vec3 mate_avoidance_dir = mate->avoid_mates(avoidance_radius_ratio);
+            vec3 wall_avoidance_dir =
+                mate->avoid_walls(avoidance_radius_ratio, cube_faces);
+            vec3 alignment_dir = mate->alignment(alignment_radius_ratio);
+            vec3 cohesion_dir = mate->cohesion();
 
-        next_mate->drawn = false;
-        next_mate->dir = new_dir;
-        next_mate->pos = new_pos;
-    }
+            vec3 new_dir = normalize(
+                mate->dir + random_dir_variation + 0.075f * wall_avoidance_dir
+                + avoidance_coeff * 0.05f * mate_avoidance_dir
+                + alignment_coeff * 0.05f * alignment_dir
+                + cohesion_coeff * 0.05f * cohesion_dir);
+            vec3 new_pos = mate->pos + dt * (mate->speed * new_dir);
+
+            next_mate->drawn = false;
+            next_mate->dir = new_dir;
+            next_mate->pos = new_pos;
+        }
+    };
+
+    for (size_t i = 0; i < nb_threads; ++i)
+        thread_pool.emplace_back(lambda, i);
+    for (auto &t : thread_pool)
+        t.join();
 
     cur_mates.swap(next_mates);
 }
@@ -132,7 +143,7 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
             cohesion_coeff);
 
     update_flock();
-    auto cur = *cur_mates;
+    auto &cur = *cur_mates;
     for (auto &mate : cur)
         mate->findVisibleMates(cur, mate_view_angle);
 
