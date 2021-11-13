@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <thread>
 
 #include "main/scene_base/base.hpp"
 
@@ -32,7 +33,8 @@ struct mate
     vcl::vec3 color;
     float infectivity;
 
-    mate(vcl::vec3 pos, vcl::vec3 dir, float speed, float &fov_radius, vcl::vec3 color, float infectivity)
+    mate(vcl::vec3 pos, vcl::vec3 dir, float speed, float &fov_radius,
+         vcl::vec3 color, float infectivity)
         : pos{ pos }
         , dir{ dir }
         , speed{ speed }
@@ -71,30 +73,36 @@ struct mate
         }
     }
 
-    void update_color() {
+    vcl::vec3 update_color()
+    {
         int len = visibleMates.size();
+        vcl::vec3 color;
 
-        if (len == 0) {
+        if (len == 0)
             color = base_color;
-        } else {
+        else
+        {
             float R = 0, G = 0, B = 0;
 
-            for (const auto &mate : visibleMates) {
+            for (const auto &mate : visibleMates)
+            {
                 auto c = mate->color;
                 R += c[0];
                 G += c[1];
                 B += c[2];
             }
 
-            R = color[0] * infectivity + (R / len) * (1 - infectivity);
-            G = color[1] * infectivity + (G / len) * (1 - infectivity);
-            B = color[2] * infectivity + (B / len) * (1 - infectivity);
+            R = this->color[0] * infectivity + (R / len) * (1 - infectivity);
+            G = this->color[1] * infectivity + (G / len) * (1 - infectivity);
+            B = this->color[2] * infectivity + (B / len) * (1 - infectivity);
 
             color = { R, G, B };
         }
+
+        return color;
     }
 
-    vcl::vec3 avoid_mates(float avoid_ratio)
+    vcl::vec3 avoid_mates(float avoid_ratio) const
     {
         vcl::vec3 f{ 0, 0, 0 };
         for (const auto &mate : visibleMates)
@@ -114,7 +122,8 @@ struct mate
         return f_norm == 0 ? f : f / f_norm;
     }
 
-    vcl::vec3 avoid_walls(float avoid_ratio, const vcl::buffer<plane> &faces)
+    vcl::vec3 avoid_walls(float avoid_ratio,
+                          const vcl::buffer<plane> &faces) const
     {
         vcl::vec3 f{ 0, 0, 0 };
         for (const auto &face : faces)
@@ -135,7 +144,7 @@ struct mate
         return f_norm == 0 ? f : f / f_norm;
     }
 
-    vcl::vec3 cohesion()
+    vcl::vec3 cohesion() const
     {
         vcl::vec3 center{ 0, 0, 0 };
         for (const auto &mate : visibleMates)
@@ -148,7 +157,7 @@ struct mate
         return center_dir_norm == 0 ? center_dir : center_dir / center_dir_norm;
     }
 
-    vcl::vec3 alignment(float alignment_ratio)
+    vcl::vec3 alignment(float alignment_ratio) const
     {
         vcl::vec3 mate_dir{ 0, 0, 0 };
         for (const auto &mate : visibleMates)
@@ -188,7 +197,8 @@ struct scene_model : scene_base
                     scene_structure &scene, gui_structure &gui);
     void update_flock();
 
-    int n_mates = 500;
+    const int n_mates = 500;
+    const unsigned short nb_threads = 6;
     float mate_view_angle = 180;
     float fov_radius = 0.35f;
     float avoidance_radius_ratio = 0.25f;
@@ -198,14 +208,14 @@ struct scene_model : scene_base
     float cohesion_coeff = 0.5f;
     bool debug_mode = false;
 
-    flock mates;
+    std::shared_ptr<flock> cur_mates;
+    std::shared_ptr<flock> next_mates;
     vcl::mesh_drawable mate_mesh;
 
     vcl::buffer<plane> cube_faces;
     vcl::segments_drawable borders;
 
     vcl::timer_event timer;
-    random_real_generator var_gen{ -RANDOM_VARIATION, RANDOM_VARIATION };
 };
 
 #endif

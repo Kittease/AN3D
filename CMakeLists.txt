@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 2.8)
 project(pgm)
 
 add_definitions(-DIMGUI_IMPL_OPENGL_LOADER_GLAD)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 # Add G++ Warning on Unix
 if(UNIX)
@@ -36,7 +38,7 @@ add_executable(pgm ${source_files})
 
 
 if(UNIX)
-target_link_libraries(pgm glfw dl -static-libstdc++)
+target_link_libraries(pgm glfw dl -static-libstdc++ Threads::Threads)
 endif()
 
 if(WIN32)

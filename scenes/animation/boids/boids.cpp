@@ -5,11 +5,9 @@
 
 #ifdef SCENE_BOIDS
 
-#    define CUBE_HALF 2
+#    define CUBE_HALF 1
 
 using namespace vcl;
-
-
 
 static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
                     float &avoidance_coeff, float &avoidance_radius_ratio,
@@ -69,8 +67,10 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
 
     gui.show_frame_camera = false;
 
-    mates.reserve(n_mates);
-
+    cur_mates = std::make_shared<flock>();
+    next_mates = std::make_shared<flock>();
+    cur_mates->reserve(n_mates);
+    next_mates->reserve(n_mates);
     random_real_generator init_gen{ -CUBE_HALF + 0.2, CUBE_HALF - 0.2 };
 
     random_real_generator color_shuffle{ 0, 3 };
@@ -81,24 +81,25 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
     for (int i = 0; i < n_mates; i++)
     {
         vcl::vec3 pos{ init_gen(), init_gen(), init_gen() };
-
         vcl::vec3 dir{ init_gen(), init_gen(), init_gen() };
         dir = vcl::normalize(dir);
-
         vcl::vec3 color;
-        switch (int(color_shuffle())) {
-            case 0:
-                color = { color_dom(), color_sub(), color_sub() };
-                break;
-            case 1:
-                color = { color_sub(), color_dom(), color_sub() };
-                break;
-            case 2:
-                color = { color_sub(), color_sub(), color_dom() };
-                break;
+        switch (int(color_shuffle()))
+        {
+        case 0:
+            color = { color_dom(), color_sub(), color_sub() };
+            break;
+        case 1:
+            color = { color_sub(), color_dom(), color_sub() };
+            break;
+        case 2:
+            color = { color_sub(), color_sub(), color_dom() };
+            break;
         }
-
-        mates.push_back(std::make_shared<mate>(mate{pos, dir, 0.5, fov_radius, color, infectivity_gen() }));
+        cur_mates->push_back(std::make_shared<mate>(
+            mate{ pos, dir, 0.5, fov_radius, color, infectivity_gen() }));
+        next_mates->push_back(std::make_shared<mate>(
+            mate{ pos, dir, 0.5, fov_radius, color, infectivity_gen() }));
     }
 
     mate_mesh =
@@ -109,29 +110,46 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
 void scene_model::update_flock()
 {
     float dt = 0.02f * timer.scale;
-    for (auto &mate : mates)
-    {
-        mate->drawn = false;
-        vec3 old_pos = mate->pos;
-        vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
-        mate->findVisibleMates(mates, mate_view_angle);
-        vec3 mate_avoidance_dir = mate->avoid_mates(avoidance_radius_ratio);
-        vec3 wall_avoidance_dir =
-            mate->avoid_walls(avoidance_radius_ratio, cube_faces);
-        vec3 alignment_dir = mate->alignment(alignment_radius_ratio);
-        vec3 cohesion_dir = mate->cohesion();
+    auto &cur = *cur_mates;
+    auto &next = *next_mates;
 
-        mate->update_color();
+    auto thread_pool = std::vector<std::thread>();
+    thread_pool.reserve(nb_threads);
+    auto lambda = [&](size_t i) {
+        random_real_generator var_gen{ -RANDOM_VARIATION, RANDOM_VARIATION };
+        for (size_t j = i; j < cur.size(); j += nb_threads)
+        {
+            const auto &mate = cur[j];
+            auto &next_mate = next[j];
 
-        vec3 new_dir = normalize(mate->dir + random_dir_variation
-                                 + 0.075f * wall_avoidance_dir
-                                 + avoidance_coeff * 0.05f * mate_avoidance_dir
-                                 + alignment_coeff * 0.05f * alignment_dir
-                                 + cohesion_coeff * 0.05f * cohesion_dir);
-        vec3 new_pos = old_pos + dt * (mate->speed * new_dir);
-        mate->dir = new_dir;
-        mate->pos = new_pos;
-    }
+            vec3 random_dir_variation{ var_gen(), var_gen(), var_gen() };
+            mate->findVisibleMates(cur, mate_view_angle);
+            vec3 mate_avoidance_dir = mate->avoid_mates(avoidance_radius_ratio);
+            vec3 wall_avoidance_dir =
+                mate->avoid_walls(avoidance_radius_ratio, cube_faces);
+            vec3 alignment_dir = mate->alignment(alignment_radius_ratio);
+            vec3 cohesion_dir = mate->cohesion();
+
+            vec3 new_dir = normalize(
+                mate->dir + random_dir_variation + 0.075f * wall_avoidance_dir
+                + avoidance_coeff * 0.05f * mate_avoidance_dir
+                + alignment_coeff * 0.05f * alignment_dir
+                + cohesion_coeff * 0.05f * cohesion_dir);
+            vec3 new_pos = mate->pos + dt * (mate->speed * new_dir);
+
+            next_mate->drawn = false;
+            next_mate->color = mate->update_color();
+            next_mate->dir = new_dir;
+            next_mate->pos = new_pos;
+        }
+    };
+
+    for (size_t i = 0; i < nb_threads; ++i)
+        thread_pool.emplace_back(lambda, i);
+    for (auto &t : thread_pool)
+        t.join();
+
+    cur_mates.swap(next_mates);
 }
 
 void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
@@ -143,22 +161,26 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
             cohesion_coeff, debug_mode);
 
     update_flock();
-    if (!debug_mode) {
-        for (const auto &mate : mates)
-            mate->draw_mate(mate_mesh, scene.camera, mate->color);
-    } else {
-        mates[0]->draw_mate(mate_mesh, scene.camera, { 0.2, 0.3, 1 });
-        for (const auto &mate : mates[0]->visibleMates)
+    const auto &cur = *cur_mates;
+
+    if (debug_mode)
+    {
+        auto &subject_0 = *cur[0];
+        subject_0.draw_mate(mate_mesh, scene.camera, { 0.2, 0.3, 1 });
+        for (const auto &mate : subject_0.visibleMates)
         {
-            auto distToMate = norm(mate->pos - mates[0]->pos);
-            if (distToMate < mates[0]->fov_radius * avoidance_radius_ratio)
+            auto distToMate = norm(mate->pos - subject_0.pos);
+            if (distToMate < subject_0.fov_radius * avoidance_radius_ratio)
                 mate->draw_mate(mate_mesh, scene.camera, { 1., 0.2, 0.3 });
-            else if (distToMate < mates[0]->fov_radius)
+            else if (distToMate < subject_0.fov_radius)
                 mate->draw_mate(mate_mesh, scene.camera, { 0.2, 1., 0.3 });
         }
-        for (const auto &mate : mates)
+        for (const auto &mate : cur)
             mate->draw_mate(mate_mesh, scene.camera, { 0.2, 0.8, 1 });
     }
+    else
+        for (const auto &mate : cur)
+            mate->draw_mate(mate_mesh, scene.camera, mate->color);
 
     draw(borders, scene.camera, shaders["curve"]);
 }
