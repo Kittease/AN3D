@@ -5,6 +5,8 @@
 
 #ifdef SCENE_BOIDS
 
+#    define CUBE_HALF 2
+
 using namespace vcl;
 
 static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
@@ -22,24 +24,42 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
 {
     cube_faces.resize(6);
     cube_faces[0].n = { 0, 1, 0 };
-    cube_faces[0].a = { 0, -1, 0 };
+    cube_faces[0].a = { 0, -CUBE_HALF, 0 };
     cube_faces[1].n = { 0, -1, 0 };
-    cube_faces[1].a = { 0, 1, 0 };
+    cube_faces[1].a = { 0, CUBE_HALF, 0 };
     cube_faces[2].n = { 1, 0, 0 };
-    cube_faces[2].a = { -1, 0, 0 };
+    cube_faces[2].a = { -CUBE_HALF, 0, 0 };
     cube_faces[3].n = { -1, 0, 0 };
-    cube_faces[3].a = { 1, 0, 0 };
+    cube_faces[3].a = { CUBE_HALF, 0, 0 };
     cube_faces[4].n = { 0, 0, 1 };
-    cube_faces[4].a = { 0, 0, -1 };
+    cube_faces[4].a = { 0, 0, -CUBE_HALF };
     cube_faces[5].n = { 0, 0, -1 };
-    cube_faces[5].a = { 0, 0, 1 };
+    cube_faces[5].a = { 0, 0, CUBE_HALF };
     std::vector<vec3> borders_segments = {
-        { -1, -1, -1 }, { 1, -1, -1 }, { 1, -1, -1 }, { 1, 1, -1 },
-        { 1, 1, -1 },   { -1, 1, -1 }, { -1, 1, -1 }, { -1, -1, -1 },
-        { -1, -1, 1 },  { 1, -1, 1 },  { 1, -1, 1 },  { 1, 1, 1 },
-        { 1, 1, 1 },    { -1, 1, 1 },  { -1, 1, 1 },  { -1, -1, 1 },
-        { -1, -1, -1 }, { -1, -1, 1 }, { 1, -1, -1 }, { 1, -1, 1 },
-        { 1, 1, -1 },   { 1, 1, 1 },   { -1, 1, -1 }, { -1, 1, 1 }
+        { -CUBE_HALF, -CUBE_HALF, -CUBE_HALF },
+        { CUBE_HALF, -CUBE_HALF, -CUBE_HALF },
+        { CUBE_HALF, -CUBE_HALF, -CUBE_HALF },
+        { CUBE_HALF, CUBE_HALF, -CUBE_HALF },
+        { CUBE_HALF, CUBE_HALF, -CUBE_HALF },
+        { -CUBE_HALF, CUBE_HALF, -CUBE_HALF },
+        { -CUBE_HALF, CUBE_HALF, -CUBE_HALF },
+        { -CUBE_HALF, -CUBE_HALF, -CUBE_HALF },
+        { -CUBE_HALF, -CUBE_HALF, CUBE_HALF },
+        { CUBE_HALF, -CUBE_HALF, CUBE_HALF },
+        { CUBE_HALF, -CUBE_HALF, CUBE_HALF },
+        { CUBE_HALF, CUBE_HALF, CUBE_HALF },
+        { CUBE_HALF, CUBE_HALF, CUBE_HALF },
+        { -CUBE_HALF, CUBE_HALF, CUBE_HALF },
+        { -CUBE_HALF, CUBE_HALF, CUBE_HALF },
+        { -CUBE_HALF, -CUBE_HALF, CUBE_HALF },
+        { -CUBE_HALF, -CUBE_HALF, -CUBE_HALF },
+        { -CUBE_HALF, -CUBE_HALF, CUBE_HALF },
+        { CUBE_HALF, -CUBE_HALF, -CUBE_HALF },
+        { CUBE_HALF, -CUBE_HALF, CUBE_HALF },
+        { CUBE_HALF, CUBE_HALF, -CUBE_HALF },
+        { CUBE_HALF, CUBE_HALF, CUBE_HALF },
+        { -CUBE_HALF, CUBE_HALF, -CUBE_HALF },
+        { -CUBE_HALF, CUBE_HALF, CUBE_HALF }
     };
     borders = segments_gpu(borders_segments);
     borders.uniform.color = { 0, 0, 0 };
@@ -48,13 +68,13 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
     gui.show_frame_camera = false;
 
     mates.reserve(n_mates);
-    random_real_generator init_gen{ -0.8, 0.8 };
+    random_real_generator init_gen{ -CUBE_HALF + 0.2, CUBE_HALF - 0.2 };
     for (int i = 0; i < n_mates; i++)
     {
         vcl::vec3 dir{ init_gen(), init_gen(), init_gen() };
         dir = vcl::normalize(dir);
         mates.push_back(std::make_shared<mate>(mate{
-            { init_gen(), init_gen(), init_gen() }, dir, 0.25, fov_radius }));
+            { init_gen(), init_gen(), init_gen() }, dir, 0.5, fov_radius }));
     }
 
     mate_mesh =
