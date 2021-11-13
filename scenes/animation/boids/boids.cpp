@@ -143,7 +143,6 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
     update_flock();
     const auto &cur = *cur_mates;
 
-    /*
     auto &subject_0 = *cur[0];
     subject_0.draw_mate(mate_mesh, scene.camera, { 0.2, 0.3, 1 });
     for (const auto &mate : subject_0.visibleMates)
@@ -154,7 +153,6 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
         else if (distToMate < subject_0.fov_radius)
             mate->draw_mate(mate_mesh, scene.camera, { 0.2, 1., 0.3 });
     }
-    */
 
     for (const auto &mate : cur)
         mate->draw_mate(mate_mesh, scene.camera, { 0.2, 0.8, 1 });
