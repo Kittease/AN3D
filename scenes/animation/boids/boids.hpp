@@ -5,12 +5,18 @@
 #include "main/scene_base/base.hpp"
 
 #ifdef SCENE_BOIDS
-#    define RANDOM_VARIATION 0.3f
+#    define RANDOM_VARIATION 0.001f
 
 struct mate;
 using flock = std::vector<std::shared_ptr<mate>>;
 
 float computeAngle(const vcl::vec3 &a, const vcl::vec3 &b);
+
+struct plane
+{
+    vcl::vec3 n;
+    vcl::vec3 a;
+};
 
 struct mate
 {
@@ -28,7 +34,7 @@ struct mate
         , dir{ dir }
         , speed{ speed }
         , fov_radius{ fov_radius }
-        , avoid_radius{ fov_radius / 3 }
+        , avoid_radius{ fov_radius / 4 }
     {}
 
     void draw_mate(vcl::mesh_drawable &mate_mesh, vcl::camera_scene &camera,
@@ -60,18 +66,58 @@ struct mate
         }
     }
 
-    vcl::vec3 avoid()
+    vcl::vec3 avoid_mates()
     {
         vcl::vec3 f{ 0, 0, 0 };
         for (const auto &mate : visibleMates)
         {
             auto curToMate = mate->pos - pos;
             auto strength = vcl::norm(curToMate);
-            if (strength < avoid_radius)
-                f -= curToMate;
+            if (strength <= avoid_radius)
+            {
+                // f -= curToMate;
+                // vcl::vec3 dn = curToMate / strength * dot(dir, curToMate);
+                // vcl::vec3 dt = dir - dn;
+                // f += 0.7 * dt - 0.3 * dn;
+                f -= curToMate / (strength * strength);
+            }
+        }
+        auto f_norm = norm(f);
+        return f_norm == 0 ? f : f / f_norm;
+    }
+
+    vcl::vec3 avoid_walls(const vcl::buffer<plane> &faces)
+    {
+        vcl::vec3 f{ 0, 0, 0 };
+        for (const auto &face : faces)
+        {
+            float collision = dot(pos - face.a, face.n);
+            if (collision <= avoid_radius)
+            {
+                // float d = avoid_radius - collision;
+                // pos += d * face.n;
+                // vcl::vec3 dn = face.n / collision * dot(dir, face.n);
+                // vcl::vec3 dt = dir - dn;
+                // f += 0.7 * dt - 0.3 * dn;
+                f += face.n / (collision * collision);
+            }
         }
 
-        return f;
+        auto f_norm = norm(f);
+        return f_norm == 0 ? f : f / f_norm;
+    }
+
+    vcl::vec3 cohesion()
+    {
+        vcl::vec3 center{ 0, 0, 0 };
+        for (const auto &mate : visibleMates)
+            center += mate->pos;
+        if (!visibleMates.empty())
+            center /= visibleMates.size();
+
+        auto center_dir = center - pos;
+        auto center_dir_norm = norm(center_dir);
+        return center_dir_norm == 0 ? center_dir : center_dir / center_dir_norm;
     }
 };
 
@@ -105,9 +151,13 @@ struct scene_model : scene_base
 
     int n_mates = 300;
     float mate_view_angle = 180;
+    float avoidance_coeff = 0.5f;
+    float cohesion_coeff = 0.5f;
+
     flock mates;
     vcl::mesh_drawable mate_mesh;
 
+    vcl::buffer<plane> cube_faces;
     vcl::segments_drawable borders;
 
     vcl::timer_event timer;
