@@ -185,6 +185,7 @@ public:
             0.025, { 0, 0, 0 }, { 0, 0, 0.4 }) };
         vcl::mesh_drawable arrow_head{ vcl::mesh_primitive_cone(
             0.05, { 0, 0, 0 }, { 0, 0, 0.1 }) };
+        arrow_head.uniform.color = { 0.9, 0.3, 0.3 };
         hierarchy.add(arrow_body, "body");
         hierarchy.add(arrow_head, "head", "body", { 0, 0, 0.4 });
 
@@ -224,7 +225,7 @@ public:
         hierarchy["body"].transform.rotation = vcl::mat3::identity();
         hierarchy["body"].transform.rotation =
             rotation_between_vector_mat3({ 0, 0, 1 }, force);
-        hierarchy["body"].transform.scaling = norm(force) / max;
+        hierarchy["body"].transform.scaling = 1 + norm(force) / max;
         hierarchy.update_local_to_global_coordinates();
     }
 
