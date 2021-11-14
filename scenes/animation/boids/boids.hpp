@@ -171,6 +171,76 @@ protected:
     std::uniform_real_distribution<float> dis;
 };
 
+class Wind
+{
+public:
+    Wind(float var, float max)
+        : var{ var }
+        , max{ max }
+        , var_gen{ -var, var }
+    {
+        force = { var_gen(), var_gen(), var_gen() };
+
+        vcl::mesh_drawable arrow_body{ vcl::mesh_primitive_cylinder(
+            0.025, { 0, 0, 0 }, { 0, 0, 0.4 }) };
+        vcl::mesh_drawable arrow_head{ vcl::mesh_primitive_cone(
+            0.05, { 0, 0, 0 }, { 0, 0, 0.1 }) };
+        hierarchy.add(arrow_body, "body");
+        hierarchy.add(arrow_head, "head", "body", { 0, 0, 0.4 });
+
+        hierarchy["body"].transform.rotation =
+            vcl::rotation_between_vector_mat3({ 0, 0, 1 }, force);
+        hierarchy["body"].transform.translation = { 2, 0, 0 };
+        hierarchy["body"].transform.scaling = norm(force) / max;
+        hierarchy.update_local_to_global_coordinates();
+    }
+
+    const float &Max() const
+    {
+        return this->max;
+    }
+
+    const vcl::vec3 &Force() const
+    {
+        return this->force;
+    }
+
+    vcl::vec3 &Force()
+    {
+        return this->force;
+    }
+
+    void set_shader(GLuint shader)
+    {
+        hierarchy.set_shader_for_all_elements(shader);
+    }
+
+    void update()
+    {
+        force = { vcl::clamp(force.x + var_gen(), -max, max),
+                  vcl::clamp(force.y + var_gen(), -max, max),
+                  vcl::clamp(force.z + var_gen(), -max, max) };
+
+        hierarchy["body"].transform.rotation = vcl::mat3::identity();
+        hierarchy["body"].transform.rotation =
+            rotation_between_vector_mat3({ 0, 0, 1 }, force);
+        hierarchy["body"].transform.scaling = norm(force) / max;
+        hierarchy.update_local_to_global_coordinates();
+    }
+
+    void draw(vcl::camera_scene camera)
+    {
+        vcl::draw(hierarchy, camera);
+    }
+
+protected:
+    float var;
+    float max;
+    random_real_generator var_gen;
+    vcl::vec3 force;
+    vcl::hierarchy_mesh_drawable hierarchy;
+};
+
 struct scene_model : scene_base
 {
     void setup_data(std::map<std::string, GLuint> &shaders,
@@ -189,6 +259,8 @@ struct scene_model : scene_base
     float alignment_coeff = 0.5f;
     float cohesion_coeff = 0.5f;
     bool debug_mode = false;
+
+    Wind *wind;
 
     std::shared_ptr<flock> cur_mates;
     std::shared_ptr<flock> next_mates;

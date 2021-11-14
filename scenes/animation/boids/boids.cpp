@@ -12,7 +12,7 @@ using namespace vcl;
 static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
                     float &avoidance_coeff, float &avoidance_radius_ratio,
                     float &alignment_coeff, float &alignment_radius_ratio,
-                    float &cohesion_coeff, bool &debug_mode);
+                    float &cohesion_coeff, Wind &wind, bool &debug_mode);
 
 float computeAngle(const vcl::vec3 &a, const vcl::vec3 &b)
 {
@@ -88,6 +88,9 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
             mate{ pos, dir, 0.5, fov_radius, color, infectivity_gen() }));
     }
 
+    wind = new Wind(0.0001, 0.01);
+    wind->set_shader(shaders["mesh"]);
+
     mate_mesh =
         mesh_drawable(mesh_primitive_cone(0.02, { 0, 0, 0 }, { 0.06, 0, 0 }));
     mate_mesh.shader = shaders["mesh"];
@@ -96,6 +99,7 @@ void scene_model::setup_data(std::map<std::string, GLuint> &shaders,
 void scene_model::update_flock()
 {
     float dt = 0.02f * timer.scale;
+    wind->update();
     auto &cur = *cur_mates;
     auto &next = *next_mates;
 
@@ -115,11 +119,11 @@ void scene_model::update_flock()
             vec3 wall_avoidance_dir =
                 mate->avoid_walls(avoidance_radius_ratio, cube_faces);
 
-            vec3 new_dir = normalize(mate->dir + random_dir_variation
-                                     + 0.075f * wall_avoidance_dir
-                                     + avoidance_coeff * 0.05f * vecs.mate_avoid
-                                     + alignment_coeff * 0.05f * vecs.alignment
-                                     + cohesion_coeff * 0.05f * vecs.cohesion);
+            vec3 new_dir = normalize(
+                mate->dir + random_dir_variation + 0.075f * wall_avoidance_dir
+                + avoidance_coeff * 0.05f * vecs.mate_avoid
+                + alignment_coeff * 0.05f * vecs.alignment
+                + cohesion_coeff * 0.05f * vecs.cohesion + wind->Force());
             vec3 new_pos = mate->pos + dt * (mate->speed * new_dir);
 
             next_mate->drawn = false;
@@ -143,7 +147,7 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
     timer.update();
     set_gui(timer, fov_radius, mate_view_angle, avoidance_coeff,
             avoidance_radius_ratio, alignment_coeff, alignment_radius_ratio,
-            cohesion_coeff, debug_mode);
+            cohesion_coeff, *wind, debug_mode);
 
     update_flock();
     const auto &cur = *cur_mates;
@@ -167,18 +171,29 @@ void scene_model::frame_draw(std::map<std::string, GLuint> &shaders,
         for (const auto &mate : cur)
             mate->draw_mate(mate_mesh, scene.camera, mate->color);
 
+    wind->draw(scene.camera);
     draw(borders, scene.camera, shaders["curve"]);
 }
 
 static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
                     float &avoidance_coeff, float &avoidance_radius_ratio,
                     float &alignment_coeff, float &alignment_radius_ratio,
-                    float &cohesion_coeff, bool &debug_mode)
+                    float &cohesion_coeff, Wind &wind, bool &debug_mode)
 {
     float scale_min = 0.05f;
     float scale_max = 2.0f;
     ImGui::SliderScalar("Time scale", ImGuiDataType_Float, &timer.scale,
                         &scale_min, &scale_max, "%.2f s");
+
+    float wind_min = -wind.Max();
+    float wind_max = wind.Max();
+    vcl::vec3 &wind_force = wind.Force();
+    ImGui::SliderScalar("Wind X", ImGuiDataType_Float, &wind_force.x, &wind_min,
+                        &wind_max, "%.4f s");
+    ImGui::SliderScalar("Wind Y", ImGuiDataType_Float, &wind_force.y, &wind_min,
+                        &wind_max, "%.4f s");
+    ImGui::SliderScalar("Wind Z", ImGuiDataType_Float, &wind_force.z, &wind_min,
+                        &wind_max, "%.4f s");
 
     float fov_radius_min = 0.1f;
     float fov_radius_max = 2.f;
