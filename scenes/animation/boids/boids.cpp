@@ -122,9 +122,8 @@ void scene_model::update_flock()
             vec3 new_dir = normalize(
                 mate->dir + random_dir_variation + 0.075f * wall_avoidance_dir
                 + avoidance_coeff * 0.05f * vecs.mate_avoid
-                + 0 * alignment_coeff * 0.05f * vecs.alignment
-                + 0 * cohesion_coeff * 0.05f * vecs.cohesion
-                + 0 * wind->Force());
+                + alignment_coeff * 0.05f * vecs.alignment
+                + cohesion_coeff * 0.05f * vecs.cohesion + wind->Force());
             vec3 new_pos = mate->pos + dt * (mate->speed * new_dir);
 
             next_mate->drawn = false;
