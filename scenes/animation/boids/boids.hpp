@@ -91,7 +91,8 @@ struct mate
         float max_infectivity = infectivity;
 
         if (visibleMates.empty())
-            return { mate_avoid, alignment, center, base_color };
+            return { mate_avoid, alignment, center,
+                     0.95 * this->color + 0.05 * base_color };
 
         for (const auto &mate : visibleMates)
         {
@@ -132,7 +133,7 @@ struct mate
             alignment /= alignment_norm;
 
         return { mate_avoid, alignment, center_dir,
-                 0.9 * this->color + 0.1 * color };
+                 0.95 * this->color + 0.05 * color };
     }
 
     vcl::vec3 avoid_walls(float avoid_ratio,
