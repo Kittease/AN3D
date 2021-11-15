@@ -201,6 +201,11 @@ public:
         return this->max;
     }
 
+    bool &Shown()
+    {
+        return shown;
+    }
+
     const vcl::vec3 &Force() const
     {
         return this->force;
@@ -231,12 +236,14 @@ public:
 
     void draw(vcl::camera_scene camera)
     {
-        vcl::draw(hierarchy, camera);
+        if (shown)
+            vcl::draw(hierarchy, camera);
     }
 
 protected:
     float var;
     float max;
+    bool shown = true;
     random_real_generator var_gen;
     vcl::vec3 force;
     vcl::hierarchy_mesh_drawable hierarchy;
@@ -250,9 +257,9 @@ struct scene_model : scene_base
                     scene_structure &scene, gui_structure &gui);
     void update_flock();
 
-    const int n_mates = 500;
-    const unsigned short nb_threads = 6;
-    float mate_view_angle = 180;
+    const int n_mates = 250;
+    const unsigned short nb_threads = 3;
+    float mate_view_angle = 230;
     float fov_radius = 0.35f;
     float avoidance_radius_ratio = 0.25f;
     float avoidance_coeff = 0.5f;

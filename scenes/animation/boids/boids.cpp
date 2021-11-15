@@ -122,8 +122,9 @@ void scene_model::update_flock()
             vec3 new_dir = normalize(
                 mate->dir + random_dir_variation + 0.075f * wall_avoidance_dir
                 + avoidance_coeff * 0.05f * vecs.mate_avoid
-                + alignment_coeff * 0.05f * vecs.alignment
-                + cohesion_coeff * 0.05f * vecs.cohesion + wind->Force());
+                + 0 * alignment_coeff * 0.05f * vecs.alignment
+                + 0 * cohesion_coeff * 0.05f * vecs.cohesion
+                + 0 * wind->Force());
             vec3 new_pos = mate->pos + dt * (mate->speed * new_dir);
 
             next_mate->drawn = false;
@@ -235,6 +236,7 @@ static void set_gui(timer_basic &timer, float &fov_radius, float &angle,
                         &cohesion_coeff, &cohesion_min, &cohesion_max, "%.2f");
 
     ImGui::Checkbox("Debug Mode", &debug_mode);
+    ImGui::Checkbox("Wind flag", &wind.Shown());
 
     if (ImGui::Button("Stop"))
         timer.stop();
